@@ -1,7 +1,156 @@
-* Getting Help
+#+AUTHOR: trevor.wilson
+#+EMAIL: trevor.wilson@bloggerbust.ca
+#+startup: showeverything
+#+TAGS: [ @edit : global org ]
+#+TAGS: [ org : org_babel ]
+#+TAGS: @help(h) @window(w) @edit(e) @navigate(n) @key_binding(k) org(o) org_babel(b)
+
+* TODO [0/7]
+  - [ ] Decide if I actually have a reason for using my-keys-minor-mode-map. Maybe I should get rid of the map and set all of those key bindings to globals.
+  - [ ] I have been finding that some configurations could be palced into multiple categories. I would like to consider organizing this config so that mode specific configurations are grouped together and use tags instead of sub-headings to facilitate finding things that are related.
+  - [ ] avy-goto-char is being over written somehow by org-table-blank-field when in org-mode. Learn why this is happening and resolve issue.
+  - [ ] Make word-wrap not happen when editing code
+  - [ ] Capture is conflicting with web-mode company-web-html binding. Need to sort out these key bindings.
+  - [ ] Install and setup org-brain https://kungsgeten.github.io/org-brain.html
+  - [ ] Setup and learn to make good use of org-capture
+  - [ ] Would like to experiment how much startup performance imrpovment I would see if I made projectile-mode not global and bound it to a key.
+
+* References  
+- use-package :: https://github.com/jwiegley/use-package
+
+* Getting Help                                                        :@help:
+  Meta help is the first place you goto to find what you are looking for.
   #+BEGIN_SRC emacs-lisp
     (global-set-key (kbd "C-c h") 'help)
   #+END_SRC
+  Which-key is a package that shows all possible key options in the mini-buffer after you have started typing a key combination. This package is excellent for facilitating discoverability.
+  #+BEGIN_SRC emacs-lisp
+    (use-package which-key
+      :ensure t
+      :init
+      (which-key-mode))
+  #+END_SRC
+* Exwm
+  Refer to the [[https://github.com/ch11ng/exwm/wiki][exwm wiki for reference]].
+
+  The [[https://github.com/ch11ng/exwm/wiki#bootstrap][bootstrap documentation on the wiki]] says not to use (exwm-config-default) when you customize the configuration yourself. That made me curious so I took a look in the exwm-config.el where it is defined and discovered that it enables ido and is largely focused on custommizes its behavior to play nicely with exwm. Since I do not use ido and infact [[Helm][explicitly turn ido off]], it does not make any sense for me to call exwm-config-default. Instead, I copied what I needed from it and then made my own changes as desired.
+  #+BEGIN_SRC emacs-lisp
+    (use-package exwm
+      :init
+      ;; Make more room
+      (menu-bar-mode -1)
+      (tool-bar-mode -1)
+      (scroll-bar-mode -1)
+      (fringe-mode 1)
+      :config
+
+      ;; Make class name the buffer name
+      (add-hook 'exwm-update-class-hook
+                (lambda ()
+                  (exwm-workspace-rename-buffer exwm-class-name)))
+      
+
+      ;; 's-&': Launch application
+      (exwm-input-set-key (kbd "s-&")
+                          (lambda (command)
+                            (interactive (list (read-shell-command "$ ")))
+                            (start-process-shell-command command nil command)))
+
+      ;; 'C-k': puts exwm window into char-mode
+      ;; 's-g': puts exwm window ino line-mode
+      (exwm-input-set-key (kbd "s-g") #'exwm-input-grab-keyboard)
+
+      ;; Line-editing shortcuts
+      (setq exwm-input-simulation-keys
+            '(([?\C-b] . [left])
+              ([?\C-f] . [right])
+              ([?\C-p] . [up])
+              ([?\C-n] . [down])
+              ([?\C-a] . [home])
+              ([?\C-e] . [end])
+              ([?\M-v] . [prior])
+              ([?\C-v] . [next])
+              ([?\C-d] . [delete])
+              ([?\C-k] . [S-end delete])))
+
+      ;; Enable EXWM
+      (exwm-enable)
+      )
+
+  #+END_SRC
+
+** Workspace
+   #+BEGIN_SRC emacs-lisp
+     (use-package exwm
+       :config
+       (setq exwm-workspace-number 4)
+       ;; 's-r': Reset
+       (exwm-input-set-key (kbd "s-r") #'exwm-reset)
+       (exwm-input-set-key (kbd "s-w") #'exwm-workspace-switch)
+       (exwm-input-set-key (kbd "s-W") #'exwm-workspace-swap)
+       (exwm-input-set-key (kbd "s-k") #'exwm-workspace-delete)
+       (exwm-input-set-key (kbd "s-n") #'exwm-workspace-add)
+       ;; 's-N': Switch to certain workspace
+       (dotimes (i 10)
+         (exwm-input-set-key (kbd (format "s-%d" i))
+                             `(lambda ()
+                                (interactive)
+                                (exwm-workspace-switch-create ,i))))
+       )
+   #+END_SRC
+** System tray
+   #+BEGIN_SRC emacs-lisp
+     (use-package exwm-systemtray
+       :config
+       (exwm-systemtray-enable)
+       )
+   #+END_SRC
+** Window Spliting                                                  :@window:
+   When a window is split horizontally I would like the windows to balance and for my point to be moved to the new window.
+   #+BEGIN_SRC emacs-lisp
+     (defun split-and-follow-horizontally()
+       (interactive)
+       (split-window-below)
+       (balance-windows)
+       (other-window 1))
+     (global-set-key (kbd "C-x 2") 'split-and-follow-horizontally)
+   #+END_SRC
+   When a window is split vertically I would like the windows to balance and for my point to be moved to the new window.
+   #+BEGIN_SRC emacs-lisp
+     (defun split-and-follow-vertically()
+       (interactive)
+       (split-window-right)
+       (balance-windows)
+       (other-window 1))
+     (global-set-key (kbd "C-x 3") 'split-and-follow-vertically)
+   #+END_SRC
+   When I close a window I would like the other windows to rebalance
+   #+BEGIN_SRC emacs-lisp
+     ;; (defun delete-and-balance()
+     ;;   (interactive)
+     ;;   (delete-window)
+     ;;   (balance-windows))
+     ;; (global-set-key (kbd "C-x 0") 'delete-and-balance)
+   #+END_SRC
+** Suspend and lock the screen
+This requires xscreensaver to be installed and the daemon running. I just put the following in my ~/.xinitrc
+~xscreensaver -no-splash &~
+#+BEGIN_SRC emacs-lisp
+  (use-package exwm
+    :config
+    (exwm-input-set-key (kbd "s-l") (lambda () (interactive) (start-process "" nil "xscreensaver-command" "-lock")))
+    )
+#+END_SRC
+** dmenu for emacs
+Provides a nice large menu with its own cache for most launched applications.
+#+BEGIN_SRC emacs-lisp
+  (use-package dmenu
+    :config
+    (message "dmenu is loaded")
+  
+    :bind
+      ("s-SPC" . 'dmenu))
+#+END_SRC
 * Custom Minor Modes
   #+BEGIN_SRC emacs-lisp
     (defvar my-keys-minor-mode-map (make-keymap) "my keys")
@@ -11,7 +160,8 @@
       'my-keys-minor-mode-map)
     (my-keys-minor-mode t)
   #+END_SRC
-* Editing
+
+* Editing                                                             :@edit:
 ** Functions
   #+BEGIN_SRC emacs-lisp
     (defun select-current-line ()
@@ -28,46 +178,217 @@
       (forward-line -1)
       (indent-according-to-mode))
   #+END_SRC
-** General
-  #+BEGIN_SRC emacs-lisp
-    (global-visual-line-mode t) ;; Word wrap
+** Backups
+   #+BEGIN_SRC emacs-lisp
+     (setq save-place-file (concat user-emacs-directory "saveplace.el")) ;; save file's last point position
+     (setq-default save-place t) ;; activate point save position
+   #+END_SRC
+** Sudo
+   If you have a file open that you need root privledges for then use sudo-edit to gain privledges without having to close and re-open the file with tramp.
+   #+BEGIN_SRC emacs-lisp
+     (use-package sudo-edit
+       :bind ("s-e" . sudo-edit))
+   #+END_SRC
+** Text   
+   Line selection
+   #+BEGIN_SRC emacs-lisp
+     (define-key my-keys-minor-mode-map (kbd "M-s l") 'select-current-line)
+     (define-key my-keys-minor-mode-map (kbd "M-RET") 'line-above-current-line)
+   #+END_SRC
 
-    ;; managing state
-    (setq save-place-file (concat user-emacs-directory "saveplace.el")) ;; save file's last point position
-    (setq-default save-place t) ;; activate point save position
+   Mark Multiple
+   C-<space> M-f to mark a word then press C-c q to mark the next occurance of that word. Subsequent C-c q will continue ot mark the next unmarked occurence. Now any keystrokes will send characters to all fo the marked points.
+   #+BEGIN_SRC emacs-lisp
+     (use-package mark-multiple
+       :bind ("C-c q" . 'mark-next-like-this))
+   #+END_SRC
 
-    ;; line selection
-    (delete-selection-mode t) ;; Delete selected text
-    (define-key my-keys-minor-mode-map (kbd "M-s l") 'select-current-line)
-    (define-key my-keys-minor-mode-map (kbd "M-RET") 'line-above-current-line)
+   Expand Region
+   Use C-q to mark a region. Subsequent C-q will expand the marked region. Use this in conjunction with Mark Multiple to replace multiple occurnces of text.
+   Warning - apparently using Expand rebion and/or Mark Multiple can mess up the undo tree.
+   #+BEGIN_SRC emacs-lisp
+     (use-package expand-region
+       :bind ("C-q" . 'er/expand-region))
+   #+END_SRC
 
-    ;; auto-completion
-    (define-key my-keys-minor-mode-map (kbd "M-SPC") 'company-complete) ;; manually invoke auto-complete
+   Make text wrap to the next line for readability
+   #+BEGIN_SRC emacs-lisp
+     (global-visual-line-mode t)
+   #+END_SRC
+   
+   Delete the whole word at point   
+   #+BEGIN_SRC emacs-lisp
+     (defun kill-whole-word()
+       (interactive)
+       (backward-word)
+       (kill-word 1))
 
-    ;; movement
-    (define-key my-keys-minor-mode-map (kbd "C-c SPC") 'ace-jump-mode) ;; jump point to line, word, or char
+     (delete-selection-mode t) ;; Delete selected text
+     (global-set-key (kbd "C-c w w") 'kill-whole-word)
+   #+END_SRC
 
-    ;; Indentation
-    (electric-indent-mode t) ;; auto-indent
-    (setq-default tab-width 2) ;; by default tab will equal 2 spaces
-    (setq-default indent-tabs-mode nil) ;; use spaces not tabs
-
-    ;; working with code
-    (show-paren-mode t) ;; highlight matching parenthesis
-
+   Delete all white space between first none-white space character and pointd
+   #+BEGIN_SRC emacs-lisp
+     (use-package hungry-delete
+       :config (global-hungry-delete-mode))
+     (global-set-key (kbd "C-c d f") 'hungry-delete-forward)
+     (global-set-key (kbd "C-c d b") 'hungry-delete-backward)
+   #+END_SRC
+   
+   Kill Ring
+   #+BEGIN_SRC emacs-lisp
+     (defun copy-whole-line()
+       (interactive)
+       (save-excursion
+         (kill-new
+          (buffer-substring (point-at-bol) (point-at-eol)))))
+     (global-set-key (kbd "C-c w l") 'copy-whole-line)
+     (global-set-key (kbd "M-y") 'helm-show-kill-ring)
+   #+END_SRC   
+   
+** Navigation
+   Jump to any visible character in any open buffer that contains plain text.
+   #+BEGIN_SRC emacs-lisp
+     (use-package avy
+       :bind ("C-c C-SPC" . 'avy-goto-char)) ;; jump point to line, word, or charmp
   #+END_SRC
-** Javascript
+  Jump to any visible window
+  #+BEGIN_SRC emacs-lisp
+    (use-package switch-window   
+      :config
+      (setq switch-window-input-style 'minibuffer)
+      (setq switch-window-increase 4)
+      (setq switch-window-threshold 2)
+      (setq switch-window-shortcut-style 'querty)
+      (setq switchq-window-querty-shortcuts
+            '("a" "s" "d" "f" "h" "j" "k" "l"))
+      :bind
+      ([remap other-window] . switch-window))
+  #+END_SRC
+  M-f and M-b move between subwords. A subword is any word in a camel case word.
+  #+BEGIN_SRC emacs-lisp
+    (global-subword-mode 1)
+  #+END_SRC  
+** Indentation
+#+BEGIN_SRC emacs-lisp
+  ;; Indentation
+  (electric-indent-mode t) ;; auto-indent
+  (setq-default tab-width 2) ;; by default tab will equal 2 spaces
+  (setq-default indent-tabs-mode nil) ;; use spaces not tabs
+#+END_SRC
+** Emacs config
+   Opens config.org for editing
    #+BEGIN_SRC emacs-lisp
-     (setq js-indent-level 2) ;; set javascript tab to 2 spaces. It does not use the default.
+     (defun config-visit()
+       (interactive)
+       (find-file "~/.emacs.d/config.org"))
+     (global-set-key (kbd "C-c e") 'config-visit)
    #+END_SRC
-** Html
+
+   Uses org-mode tangle to export all of the lisp in config.org to config.el and then loads the lisp.
    #+BEGIN_SRC emacs-lisp
-   (define-key my-keys-minor-mode-map (kbd "C-c w") 'company-web-html)
+     (defun config-reload()
+       (interactive)
+       (org-babel-load-file (expand-file-name "~/.emacs.d/config.org")))
+     (global-set-key (kbd "C-c r") 'config-reload)
    #+END_SRC
-** Jade
-   #+BEGIN_SRC emacs-lisp
-   (define-key my-keys-minor-mode-map (kbd "C-c j") 'company-web-jade)
-   #+END_SRC
+** Code
+I really like to have parenthesis colour coded, but only in the context of programming.
+  #+BEGIN_SRC emacs-lisp    
+    (show-paren-mode t) ;; highlight matching parenthesis
+    (use-package rainbow-delimiters
+      :init (add-hook 'prog-mode-hook 'rainbow-delimiters-mode 1)) ; runs for every buffer that is in a programming mode
+  #+END_SRC
+*** org-bable                                                 :org:org_babel:
+    Do not open a new window. Edit source in the current window
+    #+BEGIN_SRC emacs-lisp
+      (use-package org
+        :config  
+        ;; edit code in current window rather than splitting.
+        ;; I am not sure if I like this yet or not. The downside is that you loose the context surrounding the code.
+        (setq org-src-window-setup 'current-window) 
+        )
+    #+END_SRC
+    
+    use a local directory for temporary files
+    #+BEGIN_SRC emacs-lisp
+      (use-package org
+        :config
+        (setq org-babel-temporary-directory "~/.emacs.d/.tmp")
+        )
+    #+END_SRC
+    Let's use native tab indentation when we point is inside a src block. That way we won't need to jump to native mode with C-c ' just to indent a line of code correctly.
+    #+BEGIN_SRC emacs-lisp
+      (use-package org
+        :config
+        (setq org-src-tab-acts-natively t)
+        )
+    #+END_SRC
+*** Templates
+    Emacs lisp
+    #+BEGIN_SRC emacs-lisp
+      (use-package org
+        :config
+        (add-to-list 'org-structure-template-alist
+                     '("el" "#+BEGIN_SRC emacs-lisp\n\n#+END_SRC"))
+        )
+     #+END_SRC
+*** Javascript
+    #+BEGIN_SRC emacs-lisp
+      (setq js-indent-level 2) ;; set javascript tab to 2 spaces. It does not use the default.
+    #+END_SRC
+*** Html
+    #+BEGIN_SRC emacs-lisp
+      (defun web-mode-company-setup()
+        (define-key my-keys-minor-mode-map (kbd "C-c c w") 'company-web-html))
+
+      (use-package company
+
+        :config
+        (add-hook 'web-mode-hook 'web-mode-company-setup))
+    #+END_SRC
+*** Jade
+    #+BEGIN_SRC emacs-lisp
+    (define-key my-keys-minor-mode-map (kbd "C-c c j") 'company-web-jade)
+    #+END_SRC
+*** python
+This should set the virtualenv path when python is enabled provided that a venv exists at the time it is enabled. If you open a python shell you can check sys.prefix which should point to the venv if activated.
+#+BEGIN_SRC emacs-lisp
+  (use-package auto-virtualenv
+    :ensure t)
+  (add-hook 'python-mode-hook 'auto-virtualenv-set-virtualenv)
+#+END_SRC
+Let's have the python documentation at our fingnertips rather than switching to the web browser to look things up when we need to.
+#+BEGIN_SRC emacs-lisp
+  ;I experienced an issue with this that mad python-mode always change to pydoc-mode. Not what I had intended. It seems to be treating pydoc-mode as a majore mode.
+  ;; (use-package pydoc
+  ;;   :ensure t
+  ;;   :init (add-hook 'python-mode-hook 'pydoc-mode 1))
+  (use-package helm-pydoc
+    :bind ("C-c C-d" . 'helm-pydoc))
+
+#+END_SRC
+** Yaml
+#+BEGIN_SRC emacs-lisp
+  (use-package yaml-mode
+    :mode ("\\.yaml\\'" . org-mode))
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+  (use-package flycheck-yamllint
+    :ensure t
+    :defer t
+    :init
+    (progn
+      (eval-after-load 'flycheck
+        '(add-hook 'flycheck-mode-hook 'flycheck-yamllint-setup))))
+#+END_SRC
+
+* Toml
+#+BEGIN_SRC emacs-lisp
+  (use-package conf-toml-mode
+    :mode ("\\.toml\\'" . conf-toml-mode))
+#+END_SRC
 * Emacs Misc
   #+BEGIN_SRC emacs-lisp
     (when (window-system)
@@ -76,10 +397,41 @@
     (setq inhibit-startup-message t) ;; go straight to scratch buffer on startup
     (fset 'yes-or-no-p 'y-or-n-p) ;; When emacs asks for confirmation we can reply with a y or an n
   #+END_SRC
+** Buffers
+  Don't ask for confirmation
+  #+BEGIN_SRC emacs-lisp
+    (defun kill-curr-buffer()
+      (interactive)
+      (kill-buffer (current-buffer)))
+    (global-set-key (kbd "C-x k") 'kill-curr-buffer)
+  #+END_SRC
+  
+  Kill all buffers
+  #+BEGIN_SRC emacs-lisp
+    (defun kill-all-buffers()
+      (interactive)
+      (mapc 'kill-buffer (buffer-list)))
+    (global-set-key (kbd "C-M-s-k") 'kill-all-buffers)
+  #+END_SRC
 * Mode line
   #+BEGIN_SRC emacs-lisp
     (setq display-time-day-and-date t)
     (display-time-mode 1)
+    (display-battery-mode)
+    (line-number-mode 1)
+    (column-number-mode 1)
+  #+END_SRC
+
+keeps our modeline uncluttered by hiding minor modes that we don't feel we need to see loaded on the mode-line all of the time.
+  #+BEGIN_SRC emacs-lisp
+    (use-package diminish
+      :config
+      (diminish 'which-key-mode)
+      (diminish 'hungry-delete-mode)
+      (diminish 'visual-line-mode)
+      (diminish 'subword-mode)
+      (diminish 'rainbow-delimiters-mode)
+      (diminish 'rainbow-mode))
   #+END_SRC
 * Clipboard
   #+BEGIN_SRC emacs-lisp
@@ -112,6 +464,11 @@
     (add-hook 'term-exec-hook 'oleh-term-exec-hook)
     (eval-after-load "term" '(define-key term-raw-map (kbd "C-c C-y") 'term-paste))
   #+END_SRC
+  
+  Terminal Key bindings
+  #+BEGIN_SRC emacs-lisp
+    (global-set-key (kbd "C-c t a") 'ansi-term)
+  #+END_SRC  
 * Auto backups
   #+BEGIN_SRC emacs-lisp
     (setq make-backup-file nil)        ;; don't make the tilda file when I edit a file.
@@ -127,26 +484,51 @@
   #+END_SRC
 * Helm
   #+BEGIN_SRC emacs-lisp
-    ;; I find it is less confusing if ido-mode is disabled when using helm
-    (ido-mode -1)
-    (helm-mode t)
-    ;; projectile is a fabulous way to context switch between projects and to find things in projects
-    (projectile-global-mode 1)
-    (helm-projectile-on)
-    ;; remap some keybindings to use the helm versions
-    (global-set-key (kbd "M-x")                          'undefined)
-    (global-set-key (kbd "M-x")                          'helm-M-x)
-    (global-set-key (kbd "C-x r b")                      'helm-filtered-bookmarks)
-    (global-set-key (kbd "C-x C-f")                      'helm-find-files)
+
+    (use-package helm
+      :init
+        ;; I find it is less confusing if ido-mode is disabled when using helm
+      (ido-mode -1)
+      :config
+        (helm-mode t)  
+    
+        ;; remap some keybindings to use the helm versions
+        (global-set-key (kbd "M-x")                          'undefined)
+        (global-set-key (kbd "M-x")                          'helm-M-x)
+        (global-set-key (kbd "C-x r b")                      'helm-filtered-bookmarks)
+        (global-set-key (kbd "C-x C-f")                      'helm-find-files)
+        (add-hook 'projectile-mode-hook 'helm-projectile-on)
+    )
   #+END_SRC
+* Projectile
+#+BEGIN_SRC emacs-lisp
+    (use-package projectile
+      :config
+      (projectile-global-mode 1)
+      (define-key projectile-mode-map (kbd "C-c p") 'projectile-command-map)
+  )
+#+END_SRC
 * Org-mode
+  defer loading org until we open an org file.
   #+BEGIN_SRC emacs-lisp
-    (global-set-key "\C-cl" 'org-store-link)
-    (global-set-key "\C-ca" 'org-agenda)
-    (global-set-key "\C-cc" 'org-capture)
-    (global-set-key "\C-cb" 'org-switchb)
+    (use-package org
+      :mode ("\\.org\\'" . org-mode))
   #+END_SRC
-** Editing
+  
+I want to remap org-table-blank-field as it interferes with avy jump.
+  #+BEGIN_SRC emacs-lisp
+    (use-package org
+      :config
+        (global-set-key "\C-cl" 'org-store-link)
+        (global-set-key "\C-ca" 'org-agenda)
+        (global-set-key "\C-cc" 'org-capture)
+        (global-set-key "\C-cb" 'org-switchb)
+                                            ;(global-set-key "\C-ct<DEL>" 'org-table-blank-field) 
+        )
+  #+END_SRC
+** Editing                                                        :@edit:org:
+
+*** Control how things look
    #+BEGIN_SRC emacs-lisp
      ;; org-mode settings
      ;; For some reason this electric-indent fix does not work.
@@ -154,6 +536,7 @@
      ;;                                (set (make-local-variable 'electric-indent-functions)
      ;;                                     (list (lamda(arg) 'no-indent))))) ;;disables org-mode indent so that electric-indent can be used.
      (setq org-src-fontify-natively t) ;; org-mode code snippet syntax highlighting
+     (add-hook 'org-mode-hook 'org-indent-mode)
    #+END_SRC
 * Company-mode
   #+BEGIN_SRC emacs-lisp
@@ -162,7 +545,9 @@
     (setq company-tooltip-align-annotations 't)          ; align annotations to the right tooltip border
     (setq company-idle-delay .3)                         ; decrease delay before autocompletion popup shows
     (setq company-begin-commands '(self-insert-command)) ; start autocompletion only after typing
+    (define-key my-keys-minor-mode-map (kbd "M-SPC") 'company-complete) ;; manually invoke auto-complete
     (global-set-key (kbd "C-c /") 'company-files)        ; Force complete file names on "C-c /" key
+
   #+END_SRC
 ** Web-mode
    #+BEGIN_SRC emacs-lisp
@@ -200,46 +585,69 @@
   #+END_SRC
 * rcirc-mode
   #+BEGIN_SRC emacs-lisp
-    (set-face-foreground 'rcirc-my-nick "green" nil)
-    (setq rcirc-time-format "%Y-%m-%d %H:%M ")
-    (rcirc-track-minor-mode 1)
-    ;; some channels get a lot of activity. Also, I am usually signed in for weeks at a time so let's keep these buffers from getting to big
-    (setq rcirc-buffer-maximum-lines 10000)
+    (use-package rcirc
+      ;; just testing if adding defer does the job
+      :defer
+      :config
+      (message "Inside rcirc config")
+      (setq rcirc-time-format "%Y-%m-%d %H:%M ")
+      ;; some channels get a lot of activity. Also, I am usually signed in for weeks at a time so let's keep these buffers from getting to big
+      (setq rcirc-buffer-maximum-lines 10000)      
+      (set-face-foreground 'rcirc-my-nick "green" nil)
+      (rcirc-track-minor-mode t)
+      ;; C-c c-SPC is bound to rcirc-track-minor-mode-map, but so is C-c C-@.
+      ;; unbind C-c C-SPC since I would like to use that binding for avey jump instead.
+      (define-key rcirc-track-minor-mode-map (kbd "C-c C-SPC") nil)
+      :bind ("C-c i" . rcirc))
   #+END_SRC
+
 ** Servers and channels
   #+BEGIN_SRC emacs-lisp
-    (setq rcirc-server-alist
-          '(("irc.freenode.net" :port 6697 :encryption tls
-             :channels ("#emacs" "#gentoo" "#gentoo-chat" "#gentoo-weed" "##infosec" "#infosec" "#friendly-coders" "#hurd"))))
+    (use-package rcirc
+      :after rcirc
+      :config
+      (message "config rcirc for server lists")
+      (setq rcirc-server-alist
+            '(("irc.freenode.net" :nick "dustfinger" :port 6697 :encryption tls
+               :channels ("#emacs" "#gentoo" "#gentoo-chat" "##infosec" "#infosec" "#friendly-coders" "#hurd" "#iota" "#tangle"))))
 
-    (add-to-list 'rcirc-server-alist
-                 '("irc.oftc.net" :port 6697 :encryption tls
-                   :channels ("#kernelnewbies")))
+      (add-to-list 'rcirc-server-alist
+                   '("irc.mozilla.org" :nick "dustfinger" :port 6697 :encryption tls
+                     :channels ("#webextensions")))
 
-    (add-to-list 'rcirc-server-alist
-                 '("irc.mozilla.org" :port 6697 :encryption tls
-                   :channels ("#webextensions")))
+      (add-to-list 'rcirc-server-alist
+                   '("irc.oftc.net" :nick "dustfinger" :port 6697 :encryption tls
+                     :channels ("#kernelnewbies")))
 
+      (add-to-list 'rcirc-server-alist
+                   '("irc.handmade.network" :nick "dustfinger" :port 7777 :encryption tls
+                     :channels ("#hmn")))
+      )
   #+END_SRC
 ** Authentication
    At the moment this strategy only works for auto identifying me in freenode. irc.oft.net identify has the nick and password arguments in the opposite order. I expected irc.mozilla.org to work though, but for some reason I am not being auto identified there either. When I have time I will investigate these issues a bit more
    #+BEGIN_SRC emacs-lisp
-     (setq rcirc-default-nick "dustfinger")
-     (defadvice rcirc (before rcirc-read-from-authinfo activate)
-       "Allow rcirc to read authinfo from ~/.authinfo.gpg via the auth-source API.
-     This doesn't support the chanserv auth method"
-       (unless arg
-         (dolist (p (auth-source-search :port '("nickserv")
-                                        :require '(:port :user :secret)))
-           (let ((secret (plist-get p :secret))
-                 (method (intern (plist-get p :port))))
-             (add-to-list 'rcirc-authinfo
-                          (list (plist-get p :host)
-                                method
-                                (plist-get p :user)
-                                (if (functionp secret)
-                                    (funcall secret)
-                                  secret)))))))
+     ;;     (setq rcirc-default-nick "dustfinger")
+     (use-package rcirc
+       :after rcirc
+       :config
+       (message "configuratin defadvice for rcirc")
+       (defadvice rcirc (before rcirc-read-from-authinfo activate)
+            "Allow rcirc to read authinfo from ~/.authinfo.gpg via the auth-source API.
+          This doesn't support the chanserv auth method"
+            (unless arg
+              (dolist (p (auth-source-search :port '("nickserv")
+                                             :require '(:port :user :secret)))
+                (let ((secret (plist-get p :secret))
+                      (method (intern (plist-get p :port))))
+                  (add-to-list 'rcirc-authinfo
+                               (list (plist-get p :host)
+                                     method
+                                     (plist-get p :user)
+                                     (if (functionp secret)
+                                         (funcall secret)
+                                       secret)))))))
+       )
    #+END_SRC
 * comint-mode
   #+BEGIN_SRC emacs-lisp
@@ -247,7 +655,71 @@
            (pop-to-buffer (make-comint "node-repl" "node" nil "--interactive"))
            (node-repl))
   #+END_SRC
-* Magit
+* Magit  
   #+BEGIN_SRC emacs-lisp
-    (define-key my-keys-minor-mode-map (kbd "C-c g") 'magit-status)
+    (define-key my-keys-minor-mode-map (kbd "C-c g") 'magit-status)    
   #+END_SRC
+** [[Exwm][Exwm]] fix
+   There are some [[https://github.com/ch11ng/exwm/wiki#known-issues][known issues in exwm]]. The following is to fix a known issue with magit ediff-mode
+   #+BEGIN_SRC emacs-lisp
+     (setq ediff-window-setup-function 'ediff-setup-windows-plain)
+   #+END_SRC
+* Dashboard
+#+BEGIN_SRC emacs-lisp
+  (use-package dashboard
+    :config
+    (dashboard-setup-startup-hook)
+    (setq dashboard-items '(
+                            (recents . 10)
+                            (agenda . t)
+                            (bookmarks . 10)
+                            (registers . 10)
+                            ))
+
+    (setq dashboard-banner-logo-title "Dustfinger's Dashboard")
+    (setq show-week-agenda-p t)
+    )
+#+END_SRC
+* gnus
+#+BEGIN_SRC emacs-lisp
+  (use-package gnus
+    :defer
+    :config
+    (message "inside gnus config")
+    (gnus-select-account-enable)
+    :bind ("C-c m g" . gnus))
+#+END_SRC
+* pinentry
+#+BEGIN_SRC emacs-lisp
+  (use-package pinentry
+    :config
+    (pinentry-start))
+#+END_SRC
+* Tramp
+I custom set temporary-file-directory to resolve to ~/.emacs.d/.tmp because various emacs packages were failing to write to /tmp which is its original value. I cannot remember exactly emacs packages are failing to write to /tmp, but I know it has something to do with how I have /tmp setup. Unfortunately tramp has its own tramp-compat-temporary-file-directory which uses the original value of temporary-file-directory and also fails to write to that directory. to get around this issue I have provided some advice to tramp-compat-temporary-file-directory to use tramp-compat-temporary-file-directory-funciton which ultimately retrieves the overriden value of tramp-file-directory.
+#+BEGIN_SRC emacs-lisp
+  (advice-add #'tramp-compat-temporary-file-directory :override #'tramp-compat-temporary-file-directory-function)
+#+END_SRC
+* hugo
+#+BEGIN_SRC emacs-lisp
+  (use-package ox-hugo
+    :config
+    (message "configured ox-hugo")
+    :after ox)
+
+  (use-package ox-hugo-auto-export
+    :config
+    (message "configured ox-hugo-auto-export")
+    :after ox-hugo)
+#+END_SRC
+* System Monitoring
+s-m is for monitor. I may want other monitor type tools, so I will use s-m as a prefix. The s stands for symon obiously.
+#+BEGIN_SRC emacs-lisp
+  (use-package symon
+  :bind ("s-m s" . symon-mode))
+#+END_SRC
+* Images
+#+BEGIN_SRC emacs-lisp
+  (use-package frameshot
+  :bind ("s-i c" . frameshot-take))
+#+END_SRC
